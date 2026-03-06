@@ -1,0 +1,117 @@
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# E-Commerce Order Event Pipeline — Local Dev Stack
+# Author: Gaurav Aggarwal | github.com/aggaurav1221
+#
+# Services:
+#   order-pipeline  : Spring Boot app (port 8080)
+#   mongodb         : Order store + time-series (port 27017)
+#   kafka           : Event streaming — 4 partitions (port 9092)
+#   zookeeper       : Kafka coordinator
+#   kafka-ui        : Topic inspector (port 8081)
+#   mongo-express   : DB browser (port 8082)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  order-pipeline:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: order-pipeline
+    ports:
+      - "8080:8080"
+    environment:
+      MONGODB_URI:             mongodb://mongodb:27017/orderdb
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JAVA_OPTS:               "-Xms256m -Xmx512m -XX:+UseG1GC"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks: [pipeline-net]
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7.0
+    container_name: order-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: orderdb
+    volumes:
+      - mongodb-data:/data/db
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [pipeline-net]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: order-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks: [pipeline-net]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: order-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID:                        1
+      KAFKA_ZOOKEEPER_CONNECT:                zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP:   PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS:             PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME:       PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE:        false
+    volumes:
+      - ./docker/kafka-init.sh:/docker-entrypoint-initdb.d/kafka-init.sh
+    depends_on: [zookeeper]
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks: [pipeline-net]
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: order-kafka-ui
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME:             order-pipeline
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on: [kafka]
+    networks: [pipeline-net]
+
+  mongo-express:
+    image: mongo-express:1.0
+    container_name: order-mongo-express
+    ports:
+      - "8082:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_BASICAUTH:      false
+    depends_on: [mongodb]
+    networks: [pipeline-net]
+
+volumes:
+  mongodb-data:
+
+networks:
+  pipeline-net:
+    driver: bridge

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Order Pipeline — Live Dashboard</title>
+<style>
+  :root {
+    --bg:      #0f1117;
+    --surface: #1a1d27;
+    --border:  #2a2d3e;
+    --text:    #e2e8f0;
+    --muted:   #64748b;
+    --green:   #22c55e;
+    --blue:    #3b82f6;
+    --gold:    #f59e0b;
+    --red:     #ef4444;
+    --purple:  #a855f7;
+    --cyan:    #06b6d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+  header h1 span { color: var(--blue); }
+  .status-badge {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.8rem; color: var(--muted);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+  .dot.live { background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; padding: 1.5rem 2rem 0; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.25rem;
+  }
+  .card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+  .card .value { font-size: 2rem; font-weight: 700; line-height: 1; }
+  .card .sub   { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+
+  .main { display: grid; grid-template-columns: 1fr 340px; gap: 1rem; padding: 1rem 2rem 2rem; }
+
+  .feed-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .feed-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .feed-header h2 { font-size: 0.9rem; font-weight: 600; }
+  .feed-body { height: 420px; overflow-y: auto; }
+
+  .order-row {
+    display: grid; grid-template-columns: 130px 90px 80px 80px 110px 1fr;
+    gap: 0.75rem; padding: 0.65rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78rem; align-items: center;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+  .order-row:hover { background: rgba(255,255,255,0.03); }
+  .feed-thead { background: rgba(255,255,255,0.04); font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .tier-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+  }
+  .tier-PREMIUM  { background: rgba(245,158,11,0.15); color: var(--gold); border: 1px solid rgba(245,158,11,0.3); }
+  .tier-STANDARD { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
+  .tier-BASIC    { background: rgba(100,116,139,0.15); color: var(--muted); border: 1px solid rgba(100,116,139,0.3); }
+
+  .status-badge2 { padding: 2px 7px; border-radius: 4px; font-size: 0.68rem; font-weight: 500; }
+  .s-PLACED    { background: rgba(59,130,246,0.2);  color: var(--blue); }
+  .s-CONFIRMED { background: rgba(168,85,247,0.2);  color: var(--purple); }
+  .s-SHIPPED   { background: rgba(6,182,212,0.2);   color: var(--cyan); }
+  .s-DELIVERED { background: rgba(34,197,94,0.2);   color: var(--green); }
+  .s-CANCELLED { background: rgba(239,68,68,0.2);   color: var(--red); }
+
+  .side { display: flex; flex-direction: column; gap: 1rem; }
+
+  .partition-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .partition-card h2 { font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; }
+  .partition-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+  .partition-label { font-size: 0.78rem; color: var(--muted); }
+  .partition-bar-wrap { flex: 1; margin: 0 0.75rem; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .partition-bar { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .bar-gold  { background: var(--gold); }
+  .bar-blue  { background: var(--blue); }
+  .partition-count { font-size: 0.78rem; font-weight: 600; min-width: 30px; text-align: right; }
+
+  .region-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .region-card h2 { font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; }
+  .region-row { display: flex; justify-content: space-between; font-size: 0.78rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
+  .region-row:last-child { border-bottom: none; }
+
+  .amount { color: var(--green); font-weight: 600; }
+  .order-id { font-family: monospace; color: var(--cyan); font-size: 0.75rem; }
+  .ts { color: var(--muted); font-size: 0.7rem; }
+
+  .empty { text-align: center; padding: 3rem; color: var(--muted); font-size: 0.85rem; }
+  .conn-count { font-size: 0.75rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Order Pipeline <span>Live Dashboard</span></h1>
+  <div style="display:flex;gap:1.5rem;align-items:center">
+    <span class="conn-count" id="eventCount">0 events received</span>
+    <div class="status-badge">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">Connecting...</span>
+    </div>
+  </div>
+</header>
+
+<div class="grid">
+  <div class="card">
+    <div class="label">Total Orders</div>
+    <div class="value" id="totalOrders">0</div>
+    <div class="sub">this session</div>
+  </div>
+  <div class="card">
+    <div class="label">Premium Orders</div>
+    <div class="value" style="color:var(--gold)" id="premiumOrders">0</div>
+    <div class="sub">partition 0 — priority lane</div>
+  </div>
+  <div class="card">
+    <div class="label">Revenue (INR)</div>
+    <div class="value" style="color:var(--green)" id="totalRevenue">₹0</div>
+    <div class="sub">session total</div>
+  </div>
+  <div class="card">
+    <div class="label">Avg Order Value</div>
+    <div class="value" style="color:var(--blue)" id="avgOrder">₹0</div>
+    <div class="sub">per order</div>
+  </div>
+</div>
+
+<div class="main" style="margin-top:1rem">
+  <div class="feed-card">
+    <div class="feed-header">
+      <h2>🔴 Live Order Feed</h2>
+      <span class="conn-count" id="liveCount"></span>
+    </div>
+    <div class="feed-body" id="orderFeed">
+      <div class="empty" id="emptyMsg">Waiting for order events from Kafka...</div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="partition-card">
+      <h2>📊 Partition Distribution</h2>
+      <div class="partition-row">
+        <span class="partition-label">Partition 0 (PREMIUM)</span>
+        <div class="partition-bar-wrap"><div class="partition-bar bar-gold" id="bar0" style="width:0%"></div></div>
+        <span class="partition-count" id="cnt0">0</span>
+      </div>
+      <div class="partition-row">
+        <span class="partition-label">Partitions 1-N (STANDARD)</span>
+        <div class="partition-bar-wrap"><div class="partition-bar bar-blue" id="barN" style="width:0%"></div></div>
+        <span class="partition-count" id="cntN">0</span>
+      </div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:0.5rem">
+        Custom OrderPartitioner routes PREMIUM customers to a dedicated partition for priority processing.
+      </div>
+    </div>
+
+    <div class="region-card">
+      <h2>🌍 Orders by Region</h2>
+      <div id="regionStats">
+        <div class="empty" style="padding:1rem">Awaiting data...</div>
+      </div>
+    </div>
+
+    <div class="region-card">
+      <h2>💳 Payment Methods</h2>
+      <div id="paymentStats">
+        <div class="empty" style="padding:1rem">Awaiting data...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── State ────────────────────────────────────────────────────────────────
+  let total = 0, premium = 0, standard = 0, revenue = 0, eventCount = 0;
+  const regions  = {};
+  const payments = {};
+  const MAX_ROWS = 50;
+
+  // ── SSE Connection ────────────────────────────────────────────────────────
+  const evtSource = new EventSource('/api/orders/stream');
+
+  evtSource.addEventListener('connected', (e) => {
+    document.getElementById('statusDot').classList.add('live');
+    document.getElementById('statusText').textContent = 'Connected';
+  });
+
+  evtSource.addEventListener('order', (e) => {
+    const order = JSON.parse(e.data);
+    processOrder(order);
+  });
+
+  evtSource.onerror = () => {
+    document.getElementById('statusDot').classList.remove('live');
+    document.getElementById('statusText').textContent = 'Reconnecting...';
+  };
+
+  // ── Process each incoming order ───────────────────────────────────────────
+  function processOrder(order) {
+    eventCount++;
+    total++;
+    revenue += parseFloat(order.totalAmount) || 0;
+
+    if (order.customerTier === 'PREMIUM') premium++;
+    else standard++;
+
+    regions[order.region]          = (regions[order.region] || 0) + 1;
+    payments[order.paymentMethod]  = (payments[order.paymentMethod] || 0) + 1;
+
+    updateStats();
+    addRow(order);
+    updatePartitionBars();
+    updateRegionStats();
+    updatePaymentStats();
+
+    document.getElementById('eventCount').textContent = `${eventCount} events received`;
+  }
+
+  function updateStats() {
+    document.getElementById('totalOrders').textContent = total;
+    document.getElementById('premiumOrders').textContent = premium;
+    document.getElementById('totalRevenue').textContent = '₹' + Math.round(revenue).toLocaleString('en-IN');
+    document.getElementById('avgOrder').textContent = total > 0
+      ? '₹' + Math.round(revenue / total).toLocaleString('en-IN') : '₹0';
+  }
+
+  function addRow(order) {
+    document.getElementById('emptyMsg')?.remove();
+    const feed = document.getElementById('orderFeed');
+
+    // Add header once
+    if (!document.getElementById('feedHeader')) {
+      const hdr = document.createElement('div');
+      hdr.id = 'feedHeader';
+      hdr.className = 'order-row feed-thead';
+      hdr.innerHTML = '<div>Order ID</div><div>Tier</div><div>Status</div><div>Region</div><div>Amount</div><div>Time</div>';
+      feed.prepend(hdr);
+    }
+
+    const row = document.createElement('div');
+    row.className = 'order-row';
+    const ts = order.timestamp ? new Date(order.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+    row.innerHTML = `
+      <div class="order-id">${order.orderId}</div>
+      <div><span class="tier-badge tier-${order.customerTier}">${order.customerTier}</span></div>
+      <div><span class="status-badge2 s-${order.status}">${order.status}</span></div>
+      <div style="color:var(--muted);font-size:0.75rem">${order.region}</div>
+      <div class="amount">₹${parseFloat(order.totalAmount).toLocaleString('en-IN', {maximumFractionDigits:0})}</div>
+      <div class="ts">${ts}</div>
+    `;
+
+    // Insert after header
+    const header = document.getElementById('feedHeader');
+    feed.insertBefore(row, header ? header.nextSibling : feed.firstChild);
+
+    // Remove old rows
+    const rows = feed.querySelectorAll('.order-row:not(.feed-thead)');
+    if (rows.length > MAX_ROWS) rows[rows.length - 1].remove();
+  }
+
+  function updatePartitionBars() {
+    const p0Pct = total > 0 ? Math.round(premium  / total * 100) : 0;
+    const pNPct = total > 0 ? Math.round(standard / total * 100) : 0;
+    document.getElementById('bar0').style.width = p0Pct + '%';
+    document.getElementById('barN').style.width = pNPct + '%';
+    document.getElementById('cnt0').textContent = premium;
+    document.getElementById('cntN').textContent = standard;
+  }
+
+  function updateRegionStats() {
+    const sorted = Object.entries(regions).sort((a,b) => b[1]-a[1]);
+    const max = sorted.length > 0 ? sorted[0][1] : 1;
+    document.getElementById('regionStats').innerHTML = sorted.map(([r, c]) => `
+      <div class="region-row">
+        <span>${r}</span>
+        <span style="color:var(--muted);font-size:0.7rem">${Math.round(c/total*100)}%</span>
+        <span style="color:var(--blue);font-weight:600">${c}</span>
+      </div>
+    `).join('') || '<div class="empty" style="padding:1rem">Awaiting data...</div>';
+  }
+
+  function updatePaymentStats() {
+    const sorted = Object.entries(payments).sort((a,b) => b[1]-a[1]);
+    document.getElementById('paymentStats').innerHTML = sorted.map(([p, c]) => `
+      <div class="region-row">
+        <span>${p}</span>
+        <span style="color:var(--muted);font-size:0.7rem">${Math.round(c/total*100)}%</span>
+        <span style="color:var(--green);font-weight:600">${c}</span>
+      </div>
+    `).join('') || '<div class="empty" style="padding:1rem">Awaiting data...</div>';
+  }
+</script>
+</body>
+</html>

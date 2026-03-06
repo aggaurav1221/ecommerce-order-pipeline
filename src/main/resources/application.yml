@@ -1,0 +1,60 @@
+spring:
+  application:
+    name: ecommerce-order-pipeline
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/orderdb}
+      database: orderdb
+      auto-index-creation: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+server:
+  port: 8080
+
+## ── Kafka Topics ──────────────────────────────────────────────────────────────
+kafka:
+  topics:
+    orders-placed: orders.placed
+
+## ── Order Simulator ───────────────────────────────────────────────────────────
+simulator:
+  enabled:          true
+  orders-per-batch: 5           # orders published every interval
+  interval-ms:      2000        # publish every 2 seconds
+
+## ── Actuator ──────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+## ── Logging ────────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.gaurav.ecommerce: INFO
+    org.springframework.kafka: INFO
+    org.springframework:       WARN
+
+## ── Springdoc ─────────────────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
