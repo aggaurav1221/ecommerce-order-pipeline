@@ -27,7 +27,7 @@
 
 ## 🌐 Overview
 
-A production-grade **real-time event streaming pipeline** for e-commerce order processing — demonstrating the Kafka patterns used in enterprise systems handling millions of orders.
+A production-grade **real-time event streaming pipeline** for e-commerce order processing demonstrating the Kafka patterns used in enterprise systems handling millions of orders.
 
 **What this project shows:**
 - How major e-commerce platforms (Flipkart, Amazon, Meesho) process orders in real-time
@@ -36,7 +36,7 @@ A production-grade **real-time event streaming pipeline** for e-commerce order p
 - **Server-Sent Events** pushing live order data to a browser dashboard
 - **MongoDB time-series** with TTL indexes for efficient event storage
 
-> Built with the same patterns I applied at **Amdocs** (500M+ CDR records/day) and **Accenture** (Bell Canada real-time data streaming).
+> Built with the same real-time data streaming project based scenario.
 
 ---
 
